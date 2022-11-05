@@ -43,18 +43,65 @@ class Plotter:
         self.vid_writer.write(self.frame_img)
         self.frame_img = self.base_img.copy()
 
+    def plotter_frame_transform(self, point):
+        point[0] += self.video_width / 2
+        point[1] = self.video_height - point[1]
+        point[0] *= self.width_ratio
+        point[1] *= self.height_ratio
+        return [int(point[0]), int(point[1])]
+
+    def plot_non_homog_angle(self, transformation):
+        base, angle = transformation[0], transformation[1]
+        arrow = [0, 100]
+        c = math.cos(angle)
+        s = math.sin(angle)
+        r = np.asarray([[c, -s], [s, c]])
+        arrow[0] += base[0]
+        arrow[1] += base[1]
+        arrow = np.matmul(r, np.asarray(arrow))
+        xy = np.matmul(r, np.asarray(base))
+        xy = self.plotter_frame_transform(xy)
+        arrow = self.plotter_frame_transform(arrow)
+        cv2.arrowedLine(self.frame_img, xy, arrow, (0, 0, 255), 5)
+
+    def plot_affine(self, affine):
+        xy = np.asarray([0, 100, 1])
+        origin = np.asarray([0, 0, 0])
+        xy = np.matmul(affine, xy)
+        origin = np.matmul(affine, origin)
+        xy[0] += self.video_width / 2
+        xy[1] = self.video_height - xy[1]
+        xy[0] *= self.width_ratio
+        xy[1] *= self.height_ratio
+        origin = self.plotter_frame_transform(origin)
+        # xy = [int(xy[0]), int(xy[1])]
+        # cv2.arrowedLine(self.frame_img, xy, origin, (0, 0, 255), 10)
+
+    def plot_point_cloud(self, xys):
+        for xy in xys:
+            xy[0] += self.video_width / 2
+            xy[1] = self.video_height - xy[1]
+            xy[0] *= self.width_ratio
+            xy[1] *= self.height_ratio
+            if 0 < xy[0] < self.window_width and 0 < xy[1] < self.window_height:
+                xy = [int(xy[0]), int(xy[1])]
+                cv2.circle(self.frame_img, xy, 4, (0, 0, 255), -1)
+
     def plot_text(self, text):
         cv2.putText(self.frame_img, text, (200, 200), cv2.FONT_HERSHEY_SIMPLEX, 3, (255, 255, 255), 2, cv2.LINE_AA)
 
     def plot_circle(self, xyr):
-        cv2.circle(self.frame_img, [int(xyr[0]), int(xyr[1])], int(xyr[2]), (0, 255, 0), 3)
+        if xyr == [0, 0, 0]:
+            cv2.line(self.frame_img, [int(self.window_width/2), int(self.window_height)], [int(self.window_width/2), 0], (0, 255, 0), 3)
+        else:
+            cv2.circle(self.frame_img, [int(xyr[0]), int(xyr[1])], int(xyr[2]), (0, 255, 0), 3)
 
     def plot_angle(self, angle):
-        length = 100
+        length = 150
         center = [int(self.window_width / 2), int(self.window_height - 500)]
         x = int(length * math.cos(angle) + center[0])
         y = int(length * math.sin(angle) + center[1])
-        cv2.arrowedLine(self.frame_img, center, [x, y], (0, 255, 0), 3)
+        cv2.arrowedLine(self.frame_img, center, [x, y], (0, 0, 255), 10)
 
     def plot_boundaries(self, boundaries_json):
         with open(boundaries_json) as jsonFile:

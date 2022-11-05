@@ -9,6 +9,8 @@ from ICP import ICP
 from Velocity import Velocity
 from Ransac import Ransac
 from Boundaries import Boundaries
+from Integrator import Integrator
+from scipy.io import savemat
 
 if __name__ == '__main__':
     pnp = PnP()
@@ -16,6 +18,7 @@ if __name__ == '__main__':
     plotter = Plotter()
     boundaries = Boundaries()
     # ransac = Ransac()
+    integrator = Integrator()
 
     # boundaries.find_all_boundaries()
 
@@ -28,6 +31,8 @@ if __name__ == '__main__':
     # velocity.find_all_velocity_vectors()
     # velocity.integrate_all()
 
+    pnp.save_pnp_json_as_mat()
+
     bbox_storage_dir = 'C:\\Users\\terry\\MICHIGAN\\MRacing\\YOLOv7-cone\\yolov7-cone\\runs\\bbox_storage'
     cone_points_dir = 'C:\\Users\\terry\\MICHIGAN\\MRacing\\YOLOv7-cone\\yolov7-cone\\runs\\cone_points'
     velocity_vectors_dir = 'C:\\Users\\terry\\MICHIGAN\\MRacing\\YOLOv7-cone\\yolov7-cone\\runs\\velocity_vectors'
@@ -35,18 +40,29 @@ if __name__ == '__main__':
     boundaries_dir = 'C:\\Users\\terry\\MICHIGAN\\MRacing\\YOLOv7-cone\\yolov7-cone\\runs\\boundaries'
 
     for frame_number in range(len(os.listdir(cone_points_dir))):
-        plotter.plot_frame(os.path.join(cone_points_dir, str(frame_number) + '.json'))
+        # plotter.plot_frame(os.path.join(cone_points_dir, str(frame_number) + '.json'))
         # plotter.plot_frame_bbox(os.path.join(bbox_storage_dir, str(frame_number) + '.json'))
         # plotter_absolute.plot_vector(os.path.join(velocity_vectors_dir, str(frame_number) + '.json'))
         # plotter_absolute.plot_car(os.path.join(velocity_integrals_dir, str(frame_number) + '.json'))
         # plotter.plot_line(ransac.do_ransac(os.path.join(cone_points_dir, str(frame_number) + '.json')))
-        plotter.plot_boundaries(os.path.join(boundaries_dir, str(frame_number) + '.json'))
+        # plotter.plot_boundaries(os.path.join(boundaries_dir, str(frame_number) + '.json'))
         # plotter.plot_angle(velocity.integrate_angle(frame_number))
         # plotter.plot_frame(os.path.join(cone_points_dir, str(frame_number - 8) + '.json'))
-        plotter.plot_circle(velocity.fit_circle(frame_number))
-        plotter.plot_text(str(len(pnp.get_frame_points(frame_number))))
+        # plotter.plot_circle(velocity.fit_circle(frame_number))
+        # plotter.plot_text(str(len(pnp.get_frame_points(frame_number))))
 
-        plotter.write_frame()
+        # plotter.plot_non_homog_angle(integrator.integrate(velocity.get_delta(frame_number)))
+
+        # vel = velocity.find_dumb_velocity(frame_number)
+        # a = integrator.get_absolute_point_cloud(frame_number, vel, velocity.integrate_angle(frame_number, vel))
+        # point_cloud = a[0]
+        # affine = a[1]
+        # plotter.plot_point_cloud(point_cloud)
+        # plotter.plot_affine(affine)
+
+        # plotter.plot_point_cloud(integrator.generate_points_on_boundaries(frame_number))
+
+        # plotter.write_frame()
         # plotter_absolute.write_frame()
         print("Plotter Progress | ", frame_number)
 

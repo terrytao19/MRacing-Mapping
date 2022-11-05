@@ -148,7 +148,7 @@ class Velocity:
         self.height_ratio = window_height / video_height
         self.width_ratio = window_width / video_width
         self.correlation_threshold = 50  # Measured in px
-        self.integrated_angle = -math.pi / 2
+        self.integrated_angle = math.pi / 2
         self.transformation_matrix = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
         self.turning_ratio = 4500  # px per radian
         self.out_dir = 'C:\\Users\\terry\\MICHIGAN\\MRacing\\YOLOv7-cone\\yolov7-cone\\runs\\velocity_vectors'
@@ -157,21 +157,29 @@ class Velocity:
         self.boundaries_dir = 'C:\\Users\\terry\\MICHIGAN\\MRacing\\YOLOv7-cone\\yolov7-cone\\runs\\boundaries'
 
     def fit_circle(self, frame):
+        if frame == 0:
+            return [0, 0, 0]
+
         with open(os.path.join(self.cone_points_dir, str(frame) + '.json')) as jsonFile:
             data = json.load(jsonFile)
             xy_list_blue = []
-            for i in range(10):
-                xy_list_blue.append((int(self.window_width / 2 - 100), int(self.window_height - 50)))
             xy_list_yellow = []
-            for i in range(10):
-                xy_list_yellow.append((int(self.window_width / 2 + 100), int(self.window_height - 50)))
+            virtual_points = 100
+            for i in range(int(virtual_points / 2)):
+                xy_list_blue.append((int(self.window_width / 2 - 200), int(self.window_height - 0)))
+            for i in range(int(virtual_points / 2)):
+                xy_list_yellow.append((int(self.window_width / 2 + 200), int(self.window_height - 0)))
+            for i in range(int(virtual_points / 2)):
+                xy_list_blue.append((int(self.window_width / 2 - 200), int(self.window_height - 250)))
+            for i in range(int(virtual_points / 2)):
+                xy_list_yellow.append((int(self.window_width / 2 + 200), int(self.window_height - 250)))
             for cone in data:
                 xy = cone.get("point")
                 xy[0] += self.video_width / 2
                 xy[1] = self.video_height - xy[1]
                 xy[0] *= self.width_ratio
                 xy[1] *= self.height_ratio
-                if 0 < xy[0] < self.window_width and 0 < xy[1] < self.window_height:
+                if 1000 < xy[0] < self.window_width - 1000 and 500 < xy[1] < self.window_height:
                     if cone.get("color") == [255, 0, 0]:
                         xy_list_blue.append([cone.get("point")[0], cone.get("point")[1]])
                     elif cone.get("color") == [0, 210, 255]:
@@ -192,50 +200,64 @@ class Velocity:
                             xy_list_yellow.append([cone.get("point")[0], cone.get("point")[1]])
         xb, yb, rb, xy, yy, ry = 0, 0, 0, 0, 0, 0
         avg = 1
-        if len(xy_list_blue) > 3:
+        disp = 0
+        if len(xy_list_blue) > virtual_points + 2:
             xb, yb, rb, sb = hyper_fit(xy_list_blue)
             avg = 1
-            if len(xy_list_yellow) > 3:
+            disp = 200
+            if len(xy_list_yellow) > virtual_points + 2:
                 xy, yy, ry, sy = hyper_fit(xy_list_yellow)
                 avg = 2
-        elif len(xy_list_yellow) > 3:
+                disp = 0
+        elif len(xy_list_yellow) > virtual_points + 2:
             xy, yy, ry, sy = hyper_fit(xy_list_yellow)
             avg = 1
-            if len(xy_list_blue) > 3:
+            disp = -200
+            if len(xy_list_blue) > virtual_points + 2:
                 xb, yb, rb, sb = hyper_fit(xy_list_blue)
                 avg = 2
+                disp = 0
         else:
             return self.fit_circle(frame - 1)
         xyr = [(xb + xy) / avg, (yb + yy) / avg, (rb + ry) / avg]
+        xyr[0] += disp
         for e in xyr:
             if np.isnan(e) or np.isinf(e):
                 return self.fit_circle(frame - 1)
+
+        if xyr[2] > 8000:
+            return [0, 0, 0]
         return xyr
 
-    def integrate_angle(self, frame):
-        if frame == 0:
+    def get_delta(self, frame):
+        delta_dist = 1
+        xyr = self.fit_circle(frame)
+        if xyr == [0, 0, 0]:
+            return [0, delta_dist]
+        else:
+            radius = xyr[2]
+            circum = 2 * radius * math.pi
+            d_theta = delta_dist / circum
+            return [d_theta, delta_dist]
+
+    def integrate_angle(self, frame, velocity):
+        velocity *= 7
+        xyr = self.fit_circle(frame)
+        radius = xyr[2]
+        circum = 2 * radius * math.pi
+        if circum > 1e-6:
+            d_theta = velocity / circum
+        else:
             return self.integrated_angle
-        if frame > 0:
-            with open(os.path.join(self.boundaries_dir, str(frame) + '.json')) as jsonFile:
-                data = json.load(jsonFile)
-                with open(os.path.join(self.boundaries_dir, str(frame - 1) + '.json')) as prev_jsonFile:
-                    prev_data = json.load(prev_jsonFile)
-                    average_angle = 0
-                    average_angle_counter = 1
-                    for boundary in data:
-                        ids = boundary.get("ids")
-                        if boundary.get("color") == [0, 100, 100]:
-                            self.integrated_angle = -math.pi / 2
-                        for prev_boundary in prev_data:
-                            prev_ids = prev_boundary.get("ids")
-                            if ids == prev_ids:
-                                dt = delta_angle([boundary.get("p1"), boundary.get("p2")],
-                                                 [prev_boundary.get("p1"), prev_boundary.get("p2")])
-                                if abs(dt) < 1.5:
-                                    average_angle_counter += 1
-                                    average_angle += dt
-                    average_angle /= average_angle_counter
-                    self.integrated_angle += average_angle
+        if xyr[0] < self.window_width / 2:
+            d_theta *= -1
+        if abs(d_theta) > .02:
+            self.integrated_angle += d_theta
+        with open(os.path.join(self.boundaries_dir, str(frame) + '.json')) as jsonFile:
+            data = json.load(jsonFile)
+            for boundary in data:
+                if boundary.get("color") == [0, 100, 100] and boundary.get("p1")[1] < 300:
+                    self.integrated_angle = math.pi / 2
         return self.integrated_angle
 
     def integrate(self, frame):
@@ -281,6 +303,14 @@ class Velocity:
                         vel_vector[0] += closest_point[0] - point[0]
                         vel_vector[1] += point[1] - closest_point[1]
         return [vel_vector[0] / len(vel_vector), vel_vector[1] / len(vel_vector)]
+
+    def find_dumb_velocity(self, frame):
+        if frame > 0:
+            return euclidean_distance(
+                self.find_velocity_vector(os.path.join(self.cone_points_dir, str(frame) + '.json'),
+                                          os.path.join(self.cone_points_dir, str(frame - 1) + '.json')), (0, 0))
+        else:
+            return 0
 
     def find_all_velocity_vectors(self):
         for frame in range(len(os.listdir(self.cone_points_dir))):

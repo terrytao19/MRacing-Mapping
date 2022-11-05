@@ -31,7 +31,8 @@ class Boundaries:
         self.video_height = video_height
         self.window_width = window_width
         self.window_height = window_height
-
+        self.height_ratio = window_height / video_height
+        self.width_ratio = window_width / video_width
         self.integration_frames = 3  # point id correlations from previous frames
         self.max_horizontal_correlation = 200
         self.correlation_threshold = 320
@@ -91,9 +92,26 @@ class Boundaries:
                                     c1 = get_color(prev_ids[0], data)
                                     c2 = get_color(prev_ids[1], data)
                                     if c1 == c2:
+
+
+                                        p1_ = p1
+                                        p2_ = p2
+
+                                        p1[0] += self.video_width / 2
+                                        p1[1] = self.video_height - p1[1]
+                                        p1[0] *= self.width_ratio
+                                        p1[1] *= self.height_ratio
+                                        # if 0 < p1[0] < self.window_width and 0 < p1[1] < self.window_height:
+                                        p1 = [int(p1[0]), int(p1[1])]
+                                        p2[0] += self.video_width / 2
+                                        p2[1] = self.video_height - p2[1]
+                                        p2[0] *= self.width_ratio
+                                        p2[1] *= self.height_ratio
+                                        # if 0 < p2[0] < self.window_width and 0 < p2[1] < self.window_height:
+                                        p2 = [int(p2[0]), int(p2[1])]
                                         boundary = {
-                                            "p1": p1,
-                                            "p2": p2,
+                                            "p1": p1_,
+                                            "p2": p2_,
                                             "color": prev_boundary.get("color"),
                                             "ids": [prev_ids[0], prev_ids[1]]
                                         }
